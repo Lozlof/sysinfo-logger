@@ -85,7 +85,8 @@ fn bytes_to_mib(b: u64) -> f64 {
 }
 
 fn quit() {
-
+    let now = Local::now();
+    let now_formatted = format!("{}", now.format("%Y-%m-%d %H:%M:%S"));
 }
 
 fn main() {
@@ -126,12 +127,24 @@ fn main() {
 
     let mut count: u64 = 0;
     loop {
-        //run(&mut system, false);
+        run(
+            &mut system, 
+            &config.machine_name,
+            config.memory_error_threshold,
+            config.memory_warn_threshold,
+            false
+        );
 
         count += 1;
 
         if count >= config.log_at_this_interval {
-            //run(&mut system, true);
+            run(
+                &mut system, 
+                &config.machine_name,
+                config.memory_error_threshold,
+                config.memory_warn_threshold,
+                true
+            );
             count = 0;
         }
 
@@ -139,38 +152,75 @@ fn main() {
     }
 }
 
-fn run(system: &mut System, previous_status: Status, log: bool) {
+fn run(
+    system: &mut System, 
+    machine_name: &str,
+    memory_error_threshold: f64,
+    memory_warn_threshold: f64,
+    log: bool,
+) {
     system.refresh_all();
 
     sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
     system.refresh_cpu_usage();
 
-    let total_memory = system.total_memory();
-    let used_memory = system.used_memory();
-    let free_memory = system.free_memory();
+    let total_memory = bytes_to_mib(system.total_memory());
+    let used_memory = bytes_to_mib(system.used_memory());
+    let free_memory = bytes_to_mib(system.free_memory());
 
     let logical_cpus = system.cpus().len();
     let total_cpu_percent = system.global_cpu_usage();
 
-    let mem_usage_percent = (used_memory as f64 / total_memory as f64) * 100.0;
-    let cpu_usage_percent = total_cpu_percent;
+    let memory_usage_percent = (used_memory as f64 / total_memory as f64) * 100.0;
 
+    let main_message = main_message(
+        machine_name, 
+        total_memory, 
+        used_memory, 
+        free_memory, 
+        logical_cpus, 
+        total_cpu_percent, 
+        memory_usage_percent
+    );
+   
+    if memory_usage_percent >= memory_error_threshold {
+        logger::error!("{}", memory_error_message(&main_message));
+    } 
 
+    if memory_usage_percent >= 0.0 {
+        logger::warn!("{}", memory_warn_message(&main_message));
+    }
 
-    println!("=== VM Memory ===");
-    println!("Total: {:.2} MiB", bytes_to_mib(total_memory));
-    println!("Used : {:.2} MiB", bytes_to_mib(used_memory));
-    println!("Free : {:.2} MiB", bytes_to_mib(free_memory));
-
-    println!("\n=== VM CPU ===");
-    println!("vCPUs: {}", logical_cpus);
-    println!("Total CPU usage: {:.2}%", total_cpu_percent);
-
-    println!("\n=== PER ===");
-    println!("per mem: {:.2}%", mem_usage_percent);
-    println!("per cpu: {:.2}%", cpu_usage_percent);
 }
 
+fn main_message(
+    machine_name: &str,
+    total_memory: f64,
+    used_memory: f64,
+    free_memory: f64,
+    logical_cpus: usize,
+    total_cpu_percent: f32,
+    memory_usage_percent: f64,
+) -> String{
+    let mem_header: &str = "=== VM Memory ===";
+    let cpu_header: &str = "=== VM CPU ===";
 
+    return format!(
+        "\nMachine Name: {}\n\n{}\nTotal: {:.2} MiB\nUsed: {:.2} MiB\nFree: {:.2} MiB\nPercent Used: {:.2}%\n\n{}\nvCPUs: {}\nPercent Used: {:.2}%", 
+        machine_name, mem_header, total_memory, used_memory, free_memory, memory_usage_percent, cpu_header, logical_cpus, total_cpu_percent
+    );
+}
+
+fn memory_error_message(main_message: &str) -> String {
+    return format!(
+        "\n!!! MEMORY USAGE AT CRITICAL THRESHOLD !!!\n{}", main_message
+    );
+}
+
+fn memory_warn_message(main_message: &str) -> String {
+    return format!(
+        "\n!!! memory usage at dangerous threshold !!!\n{}", main_message
+    );
+}
 
 /* FILEEND */
