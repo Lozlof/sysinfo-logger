@@ -46,32 +46,48 @@ struct Config {
     log_at_this_interval: u64,
     memory_warn_threshold: f64,
     memory_error_threshold: f64,
-    cpu_warn_threshold: f64,
-    cpu_error_threshold: f64,
+    cpu_warn_threshold: f32,
+    cpu_error_threshold: f32,
 }
 
+#[derive(Clone, PartialEq)]
 enum Status {
-    Clean
+    Clean,
+    CpuWarn,
+    CpuError,
 }
 static STATUS: OnceLock<RwLock<Status>> = OnceLock::new();
 impl Status {
     fn init() {
         STATUS.get_or_init(|| RwLock::new(Status::Clean));
     }
-    pub fn set(new_status: Status) {
+    fn set(new_status: Status) -> Result<(), String> {
         let lock = match STATUS.get() {
             Some(lock) => lock,
-            None => panic!("Status::init() was not called"),
+            None => return Err("status not initialized".to_string()),
         };
 
         let mut guard = match lock.write() {
             Ok(guard) => guard,
-            Err(_) => panic!("STATUS lock poisoned"),
+            Err(error) => return Err(format!("status poison: {}", error)),
         };
 
         *guard = new_status;
+        return Ok(());
     }
- 
+    fn get() -> Result<Status, String> {
+        let lock = match STATUS.get() {
+            Some(lock) => lock,
+            None => return Err("status not initialized".to_string()),
+        };
+
+        let guard = match lock.read() {
+            Ok(guard) => guard,
+            Err(error) => return Err(format!("status poison: {}", error)),
+        };
+
+        Ok(guard.clone())
+    }
 }
 
 fn load_config(path: &str) -> Result<Config, Box<dyn Error>> {
@@ -84,9 +100,9 @@ fn bytes_to_mib(b: u64) -> f64 {
     return b as f64 / 1024.0 / 1024.0;
 }
 
-fn quit() {
-    let now = Local::now();
-    let now_formatted = format!("{}", now.format("%Y-%m-%d %H:%M:%S"));
+fn quit(error: String, machine_name: &str) {
+    logger::error!("\nmachine name: {}\n!!! FATAL ERROR, process exiting !!!\nerror: {}",machine_name, error);
+    exit(1);
 }
 
 fn main() {
@@ -127,24 +143,32 @@ fn main() {
 
     let mut count: u64 = 0;
     loop {
-        run(
+        if let Err(error) = run(
             &mut system, 
             &config.machine_name,
             config.memory_error_threshold,
             config.memory_warn_threshold,
+            config.cpu_error_threshold,
+            config.cpu_warn_threshold,
             false
-        );
+        ) {
+            quit(error, &config.machine_name);
+        };
 
         count += 1;
 
         if count >= config.log_at_this_interval {
-            run(
+            if let Err(error) = run(
                 &mut system, 
                 &config.machine_name,
                 config.memory_error_threshold,
                 config.memory_warn_threshold,
+                config.cpu_error_threshold,
+                config.cpu_warn_threshold,
                 true
-            );
+            ) {
+                quit(error, &config.machine_name);
+            }
             count = 0;
         }
 
@@ -157,10 +181,11 @@ fn run(
     machine_name: &str,
     memory_error_threshold: f64,
     memory_warn_threshold: f64,
+    cpu_error_threshold: f32,
+    cpu_warn_threshold: f32,
     log: bool,
-) {
-    system.refresh_all();
-
+) -> Result<(), String> {
+    system.refresh_memory();
     sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
     system.refresh_cpu_usage();
 
@@ -186,11 +211,33 @@ fn run(
     if memory_usage_percent >= memory_error_threshold {
         logger::error!("{}", memory_error_message(&main_message));
     } 
-
-    if memory_usage_percent >= 0.0 {
+    else if memory_usage_percent >= memory_warn_threshold {
         logger::warn!("{}", memory_warn_message(&main_message));
     }
 
+    if total_cpu_percent >= cpu_error_threshold {
+        if Status::get()? == Status::CpuError {
+            logger::error!("{}", cpu_error_message(&main_message));
+        } else {
+            Status::set(Status::CpuError)?;
+            return Ok(());
+        }
+    }
+    else if total_cpu_percent >= cpu_warn_threshold {
+        if Status::get()? == Status::CpuWarn {
+            logger::warn!("{}", cpu_warn_message(&main_message));
+        } else {
+            Status::set(Status::CpuWarn)?;
+            return Ok(());
+        }
+    }
+
+    if log {
+        logger::info!("{}", main_message);
+    }
+
+    Status::set(Status::Clean)?;
+    return Ok(());
 }
 
 fn main_message(
@@ -216,10 +263,20 @@ fn memory_error_message(main_message: &str) -> String {
         "\n!!! MEMORY USAGE AT CRITICAL THRESHOLD !!!\n{}", main_message
     );
 }
+fn cpu_error_message(main_message: &str) -> String {
+    return format!(
+        "\n!!! CPU USAGE AT CRITICAL THRESHOLD !!!\n{}", main_message
+    );
+}
 
 fn memory_warn_message(main_message: &str) -> String {
     return format!(
         "\n!!! memory usage at dangerous threshold !!!\n{}", main_message
+    );
+}
+fn cpu_warn_message(main_message: &str) -> String {
+    return format!(
+        "\n!!! cpu usage at dangerous threshold !!!\n{}", main_message
     );
 }
 
