@@ -1,2 +1,9 @@
-/target
 config.toml
+/target/CACHEDIR.TAG
+/target/.rustc_info.json
+/target/release
+/target/debug
+/target/flycheck0
+/target/x86_64-unknown-linux-gnu/CACHEDIR.TAG
+/target/x86_64-unknown-linux-gnu/release/*
+!/target/x86_64-unknown-linux-gnu/release/sysinfo-logger
