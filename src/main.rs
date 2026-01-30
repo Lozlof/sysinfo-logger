@@ -5,6 +5,8 @@ use std::fs::read_to_string;
 use std::error::Error;
 use std::process::exit;
 use std::thread::sleep;
+use std::time::Duration;
+use std::sync::{OnceLock, RwLock};
 use sysinfo::System;
 use serde::Deserialize;
 use chrono::Local;
@@ -40,8 +42,36 @@ struct Config {
     debug_extra: bool,
     async_logging: bool,
     machine_name: String,
+    loop_seconds: u64,
+    log_at_this_interval: u64,
     memory_warn_threshold: f64,
+    memory_error_threshold: f64,
     cpu_warn_threshold: f64,
+    cpu_error_threshold: f64,
+}
+
+enum Status {
+    Clean
+}
+static STATUS: OnceLock<RwLock<Status>> = OnceLock::new();
+impl Status {
+    fn init() {
+        STATUS.get_or_init(|| RwLock::new(Status::Clean));
+    }
+    pub fn set(new_status: Status) {
+        let lock = match STATUS.get() {
+            Some(lock) => lock,
+            None => panic!("Status::init() was not called"),
+        };
+
+        let mut guard = match lock.write() {
+            Ok(guard) => guard,
+            Err(_) => panic!("STATUS lock poisoned"),
+        };
+
+        *guard = new_status;
+    }
+ 
 }
 
 fn load_config(path: &str) -> Result<Config, Box<dyn Error>> {
@@ -52,6 +82,10 @@ fn load_config(path: &str) -> Result<Config, Box<dyn Error>> {
 
 fn bytes_to_mib(b: u64) -> f64 {
     return b as f64 / 1024.0 / 1024.0;
+}
+
+fn quit() {
+
 }
 
 fn main() {
@@ -87,7 +121,25 @@ fn main() {
         exit(1);
     }
 
+    Status::init();
     let mut system = System::new_all();
+
+    let mut count: u64 = 0;
+    loop {
+        //run(&mut system, false);
+
+        count += 1;
+
+        if count >= config.log_at_this_interval {
+            //run(&mut system, true);
+            count = 0;
+        }
+
+        sleep(Duration::from_secs(config.loop_seconds));       
+    }
+}
+
+fn run(system: &mut System, previous_status: Status, log: bool) {
     system.refresh_all();
 
     sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
@@ -117,7 +169,8 @@ fn main() {
     println!("\n=== PER ===");
     println!("per mem: {:.2}%", mem_usage_percent);
     println!("per cpu: {:.2}%", cpu_usage_percent);
-
 }
+
+
 
 /* FILEEND */
