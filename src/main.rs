@@ -196,7 +196,11 @@ fn run(
     let logical_cpus = system.cpus().len();
     let total_cpu_percent = system.global_cpu_usage();
 
-    let memory_usage_percent = (used_memory as f64 / total_memory as f64) * 100.0;
+    let memory_usage_percent = if total_memory > 0.0 {
+        (used_memory / total_memory) * 100.0
+    } else {
+        0.0
+    };
 
     let main_message = main_message(
         machine_name, 
@@ -220,16 +224,16 @@ fn run(
             logger::error!("{}", cpu_error_message(&main_message));
         } else {
             Status::set(Status::CpuError)?;
-            return Ok(());
         }
+        return Ok(());
     }
     else if total_cpu_percent >= cpu_warn_threshold {
         if Status::get()? == Status::CpuWarn {
             logger::warn!("{}", cpu_warn_message(&main_message));
         } else {
             Status::set(Status::CpuWarn)?;
-            return Ok(());
         }
+        return Ok(());
     }
 
     if log {
