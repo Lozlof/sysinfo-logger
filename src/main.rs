@@ -203,6 +203,7 @@ fn run(
     let total_memory = bytes_to_mib(system.total_memory());
     let used_memory = bytes_to_mib(system.used_memory());
     let free_memory = bytes_to_mib(system.free_memory());
+    let available_memory = bytes_to_mib(system.available_memory());
 
     let logical_cpus = system.cpus().len();
     let total_cpu_percent = system.global_cpu_usage();
@@ -218,6 +219,7 @@ fn run(
         total_memory, 
         used_memory, 
         free_memory, 
+        available_memory,
         logical_cpus, 
         total_cpu_percent, 
         memory_usage_percent
@@ -260,6 +262,7 @@ fn main_message(
     total_memory: f64,
     used_memory: f64,
     free_memory: f64,
+    available_memory: f64,
     logical_cpus: usize,
     total_cpu_percent: f32,
     memory_usage_percent: f64,
@@ -268,8 +271,8 @@ fn main_message(
     let cpu_header: &str = "=== VM CPU ===";
 
     return format!(
-        "\nMachine Name: {}\n\n{}\nTotal: {:.2} MiB\nUsed: {:.2} MiB\nFree: {:.2} MiB\nPercent Used: {:.2}%\n\n{}\nvCPUs: {}\nPercent Used: {:.2}%", 
-        machine_name, mem_header, total_memory, used_memory, free_memory, memory_usage_percent, cpu_header, logical_cpus, total_cpu_percent
+        "\nMachine Name: {}\n\n{}\nTotal: {:.2} MiB\nUsed: {:.2} MiB\nFree: {:.2} MiB\nAvailable: {:.2}MiB\nPercent Used: {:.2}%\n\n{}\nvCPUs: {}\nPercent Used: {:.4}%", 
+        machine_name, mem_header, total_memory, used_memory, free_memory, available_memory, memory_usage_percent, cpu_header, logical_cpus, total_cpu_percent
     );
 }
 
