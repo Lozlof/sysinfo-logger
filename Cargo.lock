@@ -75,9 +75,9 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "better-logger"
-version = "2.1.7"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cee9398732136b4c7cf168d7d77aa82804d73a2a23fc6d6cfaec022c3486733e"
+checksum = "e77c1fa291c346471b591a4a08bd8571fcfb9f469c21af90408ff56e0490b714"
 dependencies = [
  "chrono",
  "env_logger",

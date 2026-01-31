@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-better-logger = { version = "2.1.7", features = ["native"] }
+better-logger = { version = "2.1.8", features = ["native"] }
 sysinfo = "0.38.0"
 serde = { version = "1.0.228", features = ["derive"] }
 chrono = "0.4.43"

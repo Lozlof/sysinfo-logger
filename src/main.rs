@@ -1,6 +1,6 @@
 /* MAIN.RS */
 
-use better_logger::{LoggerSettings, NetworkFormat, logger};
+use better_logger::{logger, LoggerSettings, NetworkFormat, NetworkEndpointUrl, MultipleNet};
 use std::fs::read_to_string;
 use std::error::Error;
 use std::process::exit;
@@ -37,7 +37,8 @@ struct Config {
     log_file_path: String,
     network_logs: bool,
     network_log_lvl: String,
-    network_endpoint_url: String,
+    network_endpoint_url_low: String,
+    network_endpoint_url_high: String,
     network_format: ConfigNetworkFormat,
     debug_extra: bool,
     async_logging: bool,
@@ -118,6 +119,15 @@ fn main() {
         }
     };
 
+    let endpoints = MultipleNet {
+        trace: "".to_string(),
+        debug: "".to_string(),
+        debugx: "".to_string(),
+        info: config.network_endpoint_url_low,
+        warn: config.network_endpoint_url_high.clone(),
+        error: config.network_endpoint_url_high,
+    };
+
     let settings = LoggerSettings {
         terminal_logs: config.terminal_logs,
         terminal_log_lvl: config.terminal_log_lvl,
@@ -127,7 +137,7 @@ fn main() {
         log_file_path: config.log_file_path,
         network_logs: config.network_logs,
         network_log_lvl: config.network_log_lvl,
-        network_endpoint_url: config.network_endpoint_url,
+        network_endpoint_url: NetworkEndpointUrl::Multiple(endpoints),
         network_format: config.network_format.into(),
         debug_extra: config.debug_extra,
         async_logging: config.async_logging,
