@@ -196,6 +196,7 @@ fn run(
     log: bool,
 ) -> Result<(), String> {
     system.refresh_memory();
+    system.refresh_cpu_usage();
     sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
     system.refresh_cpu_usage();
 
